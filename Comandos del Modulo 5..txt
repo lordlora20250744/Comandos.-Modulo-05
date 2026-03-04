@@ -1,0 +1,109 @@
+PRÁCTICA 1 - Sincronización de carpetas mediante rsync
+
+sudo mkdir /home/practica_rsync
+sudo chown sistemas3:sistemas3 /home/practica_rsync
+
+cd /home/practica_rsync
+touch laboratorio{1..100}.txt
+
+ssh sistemas3@192.168.1.51
+exit
+
+rsync -av /home/practica_rsync/ sistemas3@192.168.1.51:/home/sistemas3/practica_rsync/
+
+nano /home/sync_rsync.sh
+
+chmod +x /home/sync_rsync.sh
+ls -l /home/sync_rsync.sh
+
+ssh-keygen
+ssh-copy-id sistemas3@192.168.1.51
+
+touch /home/practica_rsync/prueba_cron.txt
+/home/sync_rsync.sh
+
+ssh sistemas3@192.168.1.51
+ls /home/sistemas3/practica_rsync
+exit
+
+crontab -e
+* * * * * /home/sync_rsync.sh
+crontab -l
+
+touch /home/practica_rsync/cron_ok.txt
+
+ssh sistemas3@192.168.1.51
+ls /home/sistemas3/practica_rsync
+exit
+_______________________________________________
+PRACTICA 2 – Instalación y configuración de cluster de alta disponibilidad (pacemaker)
+
+sudo apt update
+sudo apt install pacemaker corosync pcs -y
+
+sudo systemctl enable pcsd
+sudo systemctl start pcsd
+
+sudo passwd hacluster
+
+sudo pcs host auth 192.168.1.50 192.168.1.51 -u hacluster
+
+sudo pcs cluster auth nodo1 nodo2 -u hacluster -p tu_password
+
+sudo pcs cluster setup cluster_ha 192.168.1.50 192.168.1.51
+
+sudo pcs cluster setup --name mi_cluster nodo1 nodo2
+
+sudo pcs cluster start --all
+
+sudo pcs cluster enable --all
+
+sudo pcs property set stonith-enabled=false
+sudo pcs property set no-quorum-policy=ignore
+
+sudo pcs status
+sudo pcs cluster status
+
+sudo pcs resource create IP_Flotante ocf:heartbeat:IPaddr2 ip=192.168.1.100 cidr_netmask=24 op monitor interval=30s
+
+sudo pcs status
+
+ip a
+
+ping 192.168.1.100
+
+sudo reboot
+
+sudo pcs status
+ip a
+________________________________________________
+PRÁCTICA 3 - Cluster de Alta Disponibilidad HTTP
+
+sudo apt update
+sudo apt install apache2 -y
+sudo systemctl start apache2
+sudo systemctl enable apache2
+
+sudo nano /var/www/html/index.html
+
+curl http://localhost
+
+sudo apt install keepalived -y
+sudo systemctl enable keepalived
+
+sudo nano /etc/keepalived/keepalived.conf
+
+sudo systemctl restart keepalived
+sudo systemctl status keepalived
+
+ip a
+ip a | grep 192.168.1.100
+
+sudo ufw status
+sudo ufw allow 80/tcp
+sudo ufw reload
+
+ping 192.168.1.100
+
+sudo systemctl stop keepalived
+sudo systemctl start keepalived
