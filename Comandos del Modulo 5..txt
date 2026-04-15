@@ -1,109 +1,216 @@
-PRÁCTICA 1 - Sincronización de carpetas mediante rsync
+# =========================
+# PRÁCTICA 1 - Sincronización de carpetas mediante rsync
+# =========================
 
 sudo mkdir /home/practica_rsync
+# Crea la carpeta donde estarán los archivos a sincronizar
+
 sudo chown sistemas3:sistemas3 /home/practica_rsync
+# Asigna permisos al usuario sistemas3
 
 cd /home/practica_rsync
+# Entrar a la carpeta
+
 touch laboratorio{1..100}.txt
+# Crear 100 archivos de prueba
 
-ssh sistemas3@192.168.1.51
+ssh sistemas3@192.168.1.100
+# Probar conexión SSH al otro nodo usando la IP flotante
+
 exit
+# Salir de la conexión
 
-rsync -av /home/practica_rsync/ sistemas3@192.168.1.51:/home/sistemas3/practica_rsync/
+rsync -av /home/practica_rsync/ sistemas3@192.168.1.100:/home/sistemas3/practica_rsync/
+# Sincroniza la carpeta local al nodo remoto
 
 nano /home/sync_rsync.sh
+# Crear script automático de sincronización
+
+#!/bin/bash
+rsync -avz /home/practica_rsync/ sistemas3@192.168.1.100:/home/sistemas3/practica_rsync/
 
 chmod +x /home/sync_rsync.sh
+# Dar permisos de ejecución
+
 ls -l /home/sync_rsync.sh
+# Verificar permisos
 
 ssh-keygen
-ssh-copy-id sistemas3@192.168.1.51
+# Generar clave SSH
+
+ssh-copy-id sistemas3@192.168.1.100
+# Copiar clave pública al otro nodo
 
 touch /home/practica_rsync/prueba_cron.txt
-/home/sync_rsync.sh
+# Crear archivo de prueba
 
-ssh sistemas3@192.168.1.51
+/home/sync_rsync.sh
+# Ejecutar sincronización manual
+
+ssh sistemas3@192.168.1.100
+# Entrar al nodo remoto
+
 ls /home/sistemas3/practica_rsync
+# Verificar archivos sincronizados
+
 exit
+# Salir
 
 crontab -e
+# Crear tarea automática
+
 * * * * * /home/sync_rsync.sh
+
 crontab -l
+# Verificar cron configurado
 
 touch /home/practica_rsync/cron_ok.txt
+# Crear nuevo archivo para validar cron
 
-ssh sistemas3@192.168.1.51
+ssh sistemas3@192.168.1.100
+# Entrar nuevamente al nodo remoto
+
 ls /home/sistemas3/practica_rsync
+# Verificar que cron sincronizó
+
 exit
-_______________________________________________
-PRACTICA 2 – Instalación y configuración de cluster de alta disponibilidad (pacemaker)
+# Salir
+
+
+# =========================
+# PRACTICA 2 – Instalación y configuración de cluster de alta disponibilidad (pacemaker)
+# =========================
 
 sudo apt update
+# Actualiza paquetes
+
 sudo apt install pacemaker corosync pcs -y
+# Instala herramientas del cluster HA
 
 sudo systemctl enable pcsd
+# Habilita servicio pcsd
+
 sudo systemctl start pcsd
+# Inicia pcsd
 
 sudo passwd hacluster
+# Define contraseña del usuario hacluster
 
 sudo pcs host auth 192.168.1.50 192.168.1.51 -u hacluster
-
-sudo pcs cluster auth nodo1 nodo2 -u hacluster -p tu_password
-
-sudo pcs cluster setup cluster_ha 192.168.1.50 192.168.1.51
+# Autentica ambos nodos
 
 sudo pcs cluster setup --name mi_cluster nodo1 nodo2
+# Crea el cluster
 
 sudo pcs cluster start --all
+# Inicia todos los nodos
 
 sudo pcs cluster enable --all
+# Habilita inicio automático
 
 sudo pcs property set stonith-enabled=false
+# Desactiva fencing para laboratorio
+
 sudo pcs property set no-quorum-policy=ignore
+# Ignora quorum en práctica de 2 nodos
 
 sudo pcs status
-sudo pcs cluster status
+# Verifica estado
 
 sudo pcs resource create IP_Flotante ocf:heartbeat:IPaddr2 ip=192.168.1.100 cidr_netmask=24 op monitor interval=30s
+# Crea la IP flotante .100
 
 sudo pcs status
+# Confirmar recurso
 
 ip a
+# Verificar IP flotante en interfaz
 
 ping 192.168.1.100
+# Probar conectividad
 
 sudo reboot
+# Reiniciar nodo para prueba
 
 sudo pcs status
+# Confirmar que recurso sigue activo
+
 ip a
-________________________________________________
-PRÁCTICA 3 - Cluster de Alta Disponibilidad HTTP
+# Revisar si la IP flotante sigue asignada
+
+
+# =========================
+# PRÁCTICA 3 - Cluster de Alta Disponibilidad HTTP
+# =========================
 
 sudo apt update
+# Actualiza paquetes
+
 sudo apt install apache2 -y
+# Instala Apache
+
 sudo systemctl start apache2
+# Inicia Apache
+
 sudo systemctl enable apache2
+# Habilita inicio automático
 
 sudo nano /var/www/html/index.html
+# Editar página principal
+
+<h1>Servidor Web 1</h1>
+<p>Cluster funcionando correctamente</p>
 
 curl http://localhost
+# Probar servicio web local
 
 sudo apt install keepalived -y
+# Instala keepalived
+
 sudo systemctl enable keepalived
+# Habilita keepalived
 
 sudo nano /etc/keepalived/keepalived.conf
+# Configurar IP flotante VRRP
+
+vrrp_instance VI_1 {
+    state MASTER
+    interface eth0
+    virtual_router_id 51
+    priority 100
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 1234
+    }
+    virtual_ipaddress {
+        192.168.1.100
+    }
+}
 
 sudo systemctl restart keepalived
+# Reinicia keepalived
+
 sudo systemctl status keepalived
+# Verifica estado
 
 ip a
-ip a | grep 192.168.1.100
+# Revisar interfaces
 
-sudo ufw status
+ip a | grep 192.168.1.100
+# Confirmar IP flotante
+
 sudo ufw allow 80/tcp
+# Permitir Apache
+
 sudo ufw reload
+# Recargar firewall
 
 ping 192.168.1.100
+# Probar acceso a la IP flotante
 
 sudo systemctl stop keepalived
+# Simular caída del nodo
+
 sudo systemctl start keepalived
+# Levantar nuevamente
